@@ -36,8 +36,13 @@ export async function getMongoClient(): Promise<MongoClient> {
     globalCache.promise = client.connect();
   }
 
-  globalCache.client = await globalCache.promise;
-  return globalCache.client;
+  try {
+    globalCache.client = await globalCache.promise;
+    return globalCache.client;
+  } catch (err) {
+    globalCache.promise = null;
+    throw err;
+  }
 }
 
 export async function getDb(): Promise<Db> {

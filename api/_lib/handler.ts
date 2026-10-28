@@ -30,17 +30,35 @@ export type HandlerFn = (
  */
 async function parseBody(req: VercelRequest): Promise<unknown> {
   if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === 'string') {
+      try {
+        return JSON.parse(req.body);
+      } catch {
+        return req.body;
+      }
+    }
     return req.body;
+  }
+
+  // If request has already finished reading, resolve immediately
+  if ((req as { readableEnded?: boolean }).readableEnded || (req as { complete?: boolean }).complete) {
+    return {};
   }
 
   const contentType = (req.headers['content-type'] as string) || '';
 
   return new Promise((resolve, reject) => {
+    // Failsafe timer so serverless execution never hangs indefinitely
+    const timer = setTimeout(() => {
+      resolve(req.body ?? {});
+    }, 1500);
+
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => {
       chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     });
     req.on('end', () => {
+      clearTimeout(timer);
       const buffer = Buffer.concat(chunks);
       if (buffer.length === 0) {
         resolve({});
@@ -72,7 +90,10 @@ async function parseBody(req: VercelRequest): Promise<unknown> {
         resolve(buffer);
       }
     });
-    req.on('error', (err) => reject(err));
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -160,7 +181,7 @@ export function createHandler(
         JSON.stringify({
           error: {
             code: 'INTERNAL',
-            message: 'An unexpected internal error occurred.',
+            message: (err as Error)?.message || 'An unexpected internal error occurred.',
           },
         })
       );

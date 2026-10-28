@@ -1,0 +1,43 @@
+:root {
+  /* Colors */
+  --color-sand: #FBF7F0;
+  --color-card: #FFFFFF;
+  --color-card-elevated: #FFFFFF;
+  --color-ink: #1F2A33;
+  --color-muted: #6B7A86;
+  --color-lagoon: #1FA3A3;
+  --color-lagoon-hover: #198888;
+  --color-lagoon-active: #147070;
+  --color-deep-sea: #0E5A6B;
+  --color-coral: #FF7A59;
+  --color-sunshine: #FFC857;
+  --color-seafoam: #BFE9DD;
+  --color-sky: #CFE8F5;
+
+  /* Shadows (teal-tinted soft depth) */
+  --shadow-soft: 0 4px 16px -4px rgba(14, 90, 107, 0.10);
+  --shadow-card: 0 8px 24px -8px rgba(14, 90, 107, 0.14);
+  --shadow-float: 0 16px 36px -10px rgba(14, 90, 107, 0.22);
+}
+
+.dark {
+  /* Night at the beach theme */
+  --color-sand: #0B1D26;
+  --color-card: #132733;
+  --color-card-elevated: #193140;
+  --color-ink: #F2F7F9;
+  --color-muted: #8EA1AE;
+  --color-lagoon: #26BABA;
+  --color-lagoon-hover: #33C7C7;
+  --color-lagoon-active: #1FA3A3;
+  --color-deep-sea: #88D7E3;
+  --color-coral: #FF8F73;
+  --color-sunshine: #FFD475;
+  --color-seafoam: #338C75;
+  --color-sky: #204B63;
+
+  /* Shadows in dark mode */
+  --shadow-soft: 0 4px 16px -4px rgba(0, 0, 0, 0.40);
+  --shadow-card: 0 8px 24px -8px rgba(0, 0, 0, 0.50);
+  --shadow-float: 0 16px 36px -10px rgba(0, 0, 0, 0.65);
+}

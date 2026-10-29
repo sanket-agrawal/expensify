@@ -7,16 +7,22 @@ import {
   HandCoins,
   CheckCircle2,
   Copy,
-  ExternalLink,
   Plus,
   History,
-  QrCode,
+  Paperclip,
+  FileText,
+  Upload,
+  X,
+  ExternalLink,
 } from 'lucide-vue-next';
+import confetti from 'canvas-confetti';
 import { useTripStore } from '@/stores/tripStore';
 import { useExpenseStore } from '@/stores/expenseStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
-import { generateWhatsAppSummary, generateUpiDeepLink, type SettlementTransfer } from '@shared/settlement';
+import { apiClient } from '@/lib/apiClient';
+import { generateWhatsAppSummary, type SettlementTransfer } from '@shared/settlement';
+import type { SettlementAttachment } from '@shared/schemas/settlement';
 import { parseMoneyInput } from '@shared/money';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -45,9 +51,48 @@ const recordAmountInput = ref('');
 const recordNotes = ref('');
 const isSubmitting = ref(false);
 
-// UPI Modal state
-const activeUpiTransfer = ref<SettlementTransfer | null>(null);
-const upiIdInput = ref('');
+// Attachment state for payment proof
+interface ProofDraft {
+  file: File;
+  previewUrl: string;
+  isPdf: boolean;
+}
+const selectedProof = ref<ProofDraft | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerConfetti(big = false) {
+  try {
+    if (big) {
+      confetti({
+        particleCount: 120,
+        spread: 90,
+        origin: { y: 0.55 },
+      });
+      setTimeout(() => {
+        confetti({
+          particleCount: 70,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+        });
+        confetti({
+          particleCount: 70,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+        });
+      }, 250);
+    } else {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    }
+  } catch {
+    // Non-fatal if canvas-confetti cannot run
+  }
+}
 
 onMounted(async () => {
   if (!trip.value && token.value) {
@@ -67,7 +112,37 @@ const transfers = computed(() => {
   return expenseStore.getTransfers(trip.value.participants);
 });
 
-// Mark a specific minimal transfer as paid
+function handleProofSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files[0]) {
+    const file = target.files[0];
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    selectedProof.value = {
+      file,
+      previewUrl: isPdf ? '' : URL.createObjectURL(file),
+      isPdf,
+    };
+    target.value = '';
+  }
+}
+
+function removeProof() {
+  if (selectedProof.value?.previewUrl) {
+    URL.revokeObjectURL(selectedProof.value.previewUrl);
+  }
+  selectedProof.value = null;
+}
+
+function openRecordWithTransfer(t: SettlementTransfer) {
+  recordFrom.value = t.fromId;
+  recordTo.value = t.toId;
+  recordAmountInput.value = (t.amountMinor / 100).toFixed(2);
+  recordNotes.value = 'Settled via Tripsplit';
+  removeProof();
+  showRecordModal.value = true;
+}
+
+// Quick 1-click settlement
 async function markTransferAsPaid(t: SettlementTransfer) {
   if (!token.value) return;
   try {
@@ -82,13 +157,18 @@ async function markTransferAsPaid(t: SettlementTransfer) {
       },
       currentUser.value?.id
     );
-    toastSuccess(`Payment of ₹${t.amountMinor / 100} from ${t.fromName} to ${t.toName} marked as paid!`);
+    toastSuccess(`Payment of ₹${t.amountMinor / 100} marked as paid!`);
+    if (transfers.value.length === 0) {
+      triggerConfetti(true);
+    } else {
+      triggerConfetti(false);
+    }
   } catch (err) {
     toastError((err as Error).message || 'Failed to record settlement');
   }
 }
 
-// Manual custom payment record
+// Submit payment (with optional photo/PDF proof)
 async function handleRecordPayment() {
   if (!recordFrom.value || !recordTo.value) {
     toastError('Please select both sender and receiver');
@@ -106,6 +186,30 @@ async function handleRecordPayment() {
 
   isSubmitting.value = true;
   try {
+    let attachmentPayload: SettlementAttachment | undefined = undefined;
+
+    if (selectedProof.value && token.value) {
+      const draft = selectedProof.value;
+      const contentType = draft.isPdf ? 'application/pdf' : (draft.file.type || 'image/jpeg');
+
+      // Request signed PUT URL
+      const { uploadUrl, objectKey } = await apiClient.getUploadSignedUrl(token.value, {
+        filename: draft.file.name,
+        contentType,
+        size: draft.file.size,
+      });
+
+      // Upload file directly
+      await apiClient.uploadDirectToGcs(uploadUrl, draft.file, contentType);
+
+      attachmentPayload = {
+        objectKey,
+        contentType,
+        filename: draft.file.name,
+        size: draft.file.size,
+      };
+    }
+
     await expenseStore.recordSettlement(
       token.value,
       {
@@ -114,13 +218,22 @@ async function handleRecordPayment() {
         amountMinor: minor,
         date: new Date().toISOString().slice(0, 10),
         notes: recordNotes.value.trim(),
+        attachment: attachmentPayload,
       },
       currentUser.value?.id
     );
+
     toastSuccess('Payment recorded successfully');
     showRecordModal.value = false;
     recordAmountInput.value = '';
     recordNotes.value = '';
+    removeProof();
+
+    if (transfers.value.length === 0) {
+      triggerConfetti(true);
+    } else {
+      triggerConfetti(false);
+    }
   } catch (err) {
     toastError((err as Error).message || 'Failed to record payment');
   } finally {
@@ -128,21 +241,14 @@ async function handleRecordPayment() {
   }
 }
 
-function openUpiModal(t: SettlementTransfer) {
-  activeUpiTransfer.value = t;
-  upiIdInput.value = '';
-}
-
-function openUpiDeepLink() {
-  if (!activeUpiTransfer.value) return;
-  const link = generateUpiDeepLink({
-    pa: upiIdInput.value.trim() || 'friend@upi',
-    pn: activeUpiTransfer.value.toName,
-    amountMinor: activeUpiTransfer.value.amountMinor,
-    note: `${trip.value?.name || 'Trip'} settlement`,
-  });
-
-  window.open(link, '_blank');
+async function viewSettlementAttachment(attachment: SettlementAttachment) {
+  if (!token.value) return;
+  try {
+    const { url } = await apiClient.getPhotoSignedUrl(token.value, attachment.objectKey);
+    window.open(url, '_blank');
+  } catch (err) {
+    toastError('Could not load attachment');
+  }
 }
 
 // WhatsApp summary generation and copying
@@ -280,39 +386,38 @@ function goBack() {
                 variant="primary"
                 size="sm"
                 block
-                @click="markTransferAsPaid(t)"
+                @click="openRecordWithTransfer(t)"
               >
                 <template #prefix>
-                  <CheckCircle2 class="w-4 h-4 stroke-[2.5]" />
+                  <Paperclip class="w-3.5 h-3.5" />
                 </template>
-                Mark as paid
+                Settle with proof
               </Button>
 
               <Button
-                v-if="currency === 'INR'"
                 variant="secondary"
                 size="sm"
-                @click="openUpiModal(t)"
+                @click="markTransferAsPaid(t)"
               >
                 <template #prefix>
-                  <QrCode class="w-4 h-4" />
+                  <CheckCircle2 class="w-3.5 h-3.5" />
                 </template>
-                UPI pay
+                Quick settle
               </Button>
             </div>
           </Card>
         </div>
 
         <!-- All Settled Celebration Card -->
-        <Card v-else padding="lg" class="text-center py-10 space-y-3">
-          <div class="w-14 h-14 rounded-full bg-seafoam/30 text-2xl flex items-center justify-center mx-auto select-none">
-            🏖️
+        <Card v-else padding="lg" class="text-center py-10 space-y-3 bg-seafoam/5 border border-seafoam/20">
+          <div class="w-16 h-16 rounded-full bg-seafoam/20 text-3xl flex items-center justify-center mx-auto select-none shadow-sm animate-bounce">
+            🎉
           </div>
-          <h2 class="font-display text-lg font-semibold text-ink">
+          <h2 class="font-display text-xl font-bold text-ink">
             Everyone is all settled up!
           </h2>
-          <p class="text-xs text-ink-muted max-w-xs mx-auto">
-            No outstanding balances between anyone in {{ trip.name }}.
+          <p class="text-xs text-ink-muted max-w-xs mx-auto leading-relaxed">
+            All balances are cleared and zero outstanding debts remain in {{ trip.name }}.
           </p>
         </Card>
       </div>
@@ -325,7 +430,7 @@ function goBack() {
           @click="showRecordModal = true"
         >
           <Plus class="w-4 h-4" />
-          Record a custom payment (e.g. cash or partial transfer)
+          Record a custom payment (e.g. cash, partial, with proof)
         </button>
       </div>
 
@@ -345,32 +450,56 @@ function goBack() {
           <div
             v-for="s in expenseStore.settlements"
             :key="s._id"
-            class="flex items-center justify-between p-3 rounded-btn bg-card border border-sand-200/60 dark:border-white/5 text-xs shadow-soft"
+            class="flex items-center justify-between p-3 rounded-btn bg-card border border-sand-200/60 dark:border-white/5 text-xs shadow-soft gap-2"
           >
             <div class="flex items-center gap-2 min-w-0">
               <CheckCircle2 class="w-4 h-4 text-seafoam-dark shrink-0" />
-              <span class="text-ink truncate">
-                <strong>{{ tripStore.getParticipant(s.from)?.name || 'Friend' }}</strong>
-                paid
-                <strong>{{ tripStore.getParticipant(s.to)?.name || 'Friend' }}</strong>
-              </span>
+              <div class="min-w-0">
+                <span class="text-ink truncate block">
+                  <strong>{{ tripStore.getParticipant(s.from)?.name || 'Friend' }}</strong>
+                  paid
+                  <strong>{{ tripStore.getParticipant(s.to)?.name || 'Friend' }}</strong>
+                </span>
+                <span v-if="s.notes" class="text-[11px] text-ink-muted truncate block">
+                  {{ s.notes }}
+                </span>
+              </div>
             </div>
 
-            <div class="text-right shrink-0 font-semibold text-ink">
-              <MoneyText :amount-minor="s.amountMinor" :currency="currency" size="xs" />
-              <span class="block text-[10px] text-ink-muted font-normal">{{ s.date }}</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <!-- Proof badge if attached -->
+              <button
+                v-if="s.attachment"
+                type="button"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded bg-sand-100 dark:bg-white/10 hover:bg-lagoon/15 text-[11px] font-medium text-lagoon transition-colors"
+                title="View proof receipt"
+                @click="viewSettlementAttachment(s.attachment)"
+              >
+                <FileText
+                  v-if="s.attachment.contentType === 'application/pdf' || s.attachment.objectKey.endsWith('.pdf')"
+                  class="w-3.5 h-3.5 text-coral"
+                />
+                <Paperclip v-else class="w-3.5 h-3.5" />
+                <span class="hidden sm:inline">Proof</span>
+                <ExternalLink class="w-3 h-3 opacity-60" />
+              </button>
+
+              <div class="text-right shrink-0 font-semibold text-ink">
+                <MoneyText :amount-minor="s.amountMinor" :currency="currency" size="xs" />
+                <span class="block text-[10px] text-ink-muted font-normal">{{ s.date }}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Record Custom Payment Bottom Sheet -->
+    <!-- Record Payment Bottom Sheet -->
     <BottomSheet
       v-if="trip"
       v-model:open="showRecordModal"
       title="Record a payment"
-      description="Log a repayment made outside of Tripsplit"
+      description="Log a repayment with optional photo or PDF proof"
     >
       <form class="space-y-4 py-2" @submit.prevent="handleRecordPayment">
         <!-- From -->
@@ -431,6 +560,72 @@ function goBack() {
           />
         </div>
 
+        <!-- Proof Attachment Field -->
+        <div>
+          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">
+            Proof of payment (optional)
+          </label>
+
+          <!-- Selected proof badge / thumbnail -->
+          <div
+            v-if="selectedProof"
+            class="flex items-center justify-between p-2.5 rounded-btn bg-sand-100 dark:bg-white/5 border border-sand-200 dark:border-white/10"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <img
+                v-if="!selectedProof.isPdf"
+                :src="selectedProof.previewUrl"
+                alt="Proof preview"
+                class="w-10 h-10 object-cover rounded shrink-0 border border-sand-200"
+              />
+              <div
+                v-else
+                class="w-10 h-10 rounded bg-coral/15 flex items-center justify-center text-coral shrink-0"
+              >
+                <FileText class="w-5 h-5" />
+              </div>
+
+              <div class="min-w-0 text-xs">
+                <span class="font-medium text-ink truncate block">
+                  {{ selectedProof.file.name }}
+                </span>
+                <span class="text-[10px] text-ink-muted">
+                  {{ (selectedProof.file.size / 1024).toFixed(1) }} KB &bull; {{ selectedProof.isPdf ? 'PDF' : 'Image' }}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="p-1 rounded-full text-ink-muted hover:text-coral hover:bg-sand-200/50 transition-colors"
+              title="Remove proof"
+              @click="removeProof"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Add proof button if none selected -->
+          <button
+            v-else
+            type="button"
+            class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-btn border-2 border-dashed border-sand-200 dark:border-white/10 hover:border-lagoon hover:bg-lagoon/5 text-ink-muted hover:text-lagoon text-xs font-medium transition-all"
+            @click="fileInputRef?.click()"
+          >
+            <Upload class="w-4 h-4" />
+            <span>Attach receipt screenshot or PDF</span>
+          </button>
+
+          <!-- Hidden file input -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="image/*,application/pdf"
+            class="hidden"
+            @change="handleProofSelect"
+          />
+        </div>
+
         <!-- Notes -->
         <div>
           <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">
@@ -439,7 +634,7 @@ function goBack() {
           <input
             v-model="recordNotes"
             type="text"
-            placeholder="e.g. GPay transfer, Cash at checkout..."
+            placeholder="e.g. Bank transfer, Cash..."
             class="w-full px-3 py-2.5 bg-sand-100 dark:bg-white/5 rounded-btn border border-sand-200 dark:border-white/10 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lagoon"
           />
         </div>
@@ -456,54 +651,6 @@ function goBack() {
           </Button>
         </div>
       </form>
-    </BottomSheet>
-
-    <!-- UPI Deep Link Helper Sheet -->
-    <BottomSheet
-      v-if="activeUpiTransfer"
-      :open="!!activeUpiTransfer"
-      title="Pay with UPI"
-      description="Launch your UPI payment app (GPay, PhonePe, Paytm)"
-      @close="activeUpiTransfer = null"
-    >
-      <div class="space-y-4 py-2">
-        <div class="p-3 bg-sand-100 dark:bg-white/5 rounded-btn text-xs space-y-1">
-          <div class="flex justify-between">
-            <span class="text-ink-muted">Paying to:</span>
-            <span class="font-bold text-ink">{{ activeUpiTransfer.toName }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-ink-muted">Amount:</span>
-            <span class="font-bold text-lagoon">
-              <MoneyText :amount-minor="activeUpiTransfer.amountMinor" currency="INR" size="sm" />
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">
-            Enter recipient's UPI ID (optional)
-          </label>
-          <input
-            v-model="upiIdInput"
-            type="text"
-            placeholder="e.g. rahul@okaxis, 9876543210@paytm"
-            class="w-full px-3 py-2.5 bg-sand-100 dark:bg-white/5 rounded-btn border border-sand-200 dark:border-white/10 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lagoon"
-          />
-        </div>
-
-        <Button
-          variant="primary"
-          block
-          size="lg"
-          @click="openUpiDeepLink"
-        >
-          <template #prefix>
-            <ExternalLink class="w-4 h-4" />
-          </template>
-          Open UPI app
-        </Button>
-      </div>
     </BottomSheet>
   </div>
 </template>

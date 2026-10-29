@@ -158,14 +158,17 @@ async function uploadSinglePhoto(item: PhotoItem) {
   item.progress = 10;
 
   try {
-    // 1. Client-side compress image (<1600px, JPEG ~0.8)
+    const isPdf = item.file.type === 'application/pdf' || item.file.name.toLowerCase().endsWith('.pdf');
+    const contentType = isPdf ? 'application/pdf' : 'image/jpeg';
+
+    // 1. Client-side compress image (<1600px, JPEG ~0.8) - PDFs are bypassed safely
     const compressed = await compressImage(item.file);
     item.progress = 30;
 
     // 2. Request V4 signed PUT URL from serverless endpoint
     const { uploadUrl, objectKey } = await apiClient.getUploadSignedUrl(token.value, {
       filename: compressed.file.name,
-      contentType: 'image/jpeg',
+      contentType,
       size: compressed.compressedSizeBytes,
     });
     item.progress = 50;
@@ -174,7 +177,7 @@ async function uploadSinglePhoto(item: PhotoItem) {
     await apiClient.uploadDirectToGcs(
       uploadUrl,
       compressed.blob,
-      'image/jpeg',
+      contentType,
       (pct) => {
         // Map upload progress 50% -> 95%
         item.progress = 50 + Math.round((pct * 45) / 100);
@@ -234,11 +237,17 @@ async function handleSubmit() {
   try {
     const photoAttachments: PhotoAttachment[] = photos.value
       .filter((p) => p.status === 'done' && p.objectKey)
-      .map((p) => ({
-        objectKey: p.objectKey!,
-        contentType: 'image/jpeg',
-        size: p.file?.size || 1024,
-      }));
+      .map((p) => {
+        const isPdf =
+          p.file?.type === 'application/pdf' ||
+          p.file?.name?.toLowerCase().endsWith('.pdf') ||
+          p.objectKey?.toLowerCase().endsWith('.pdf');
+        return {
+          objectKey: p.objectKey!,
+          contentType: isPdf ? 'application/pdf' : (p.file?.type || 'image/jpeg'),
+          size: p.file?.size || 1024,
+        };
+      });
 
     if (isEditing.value) {
       await expenseStore.updateExpense(

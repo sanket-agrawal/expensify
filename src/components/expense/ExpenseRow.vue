@@ -87,8 +87,8 @@ const netUserImpact = computed(() => {
     </div>
 
     <!-- Right: Total Amount & Your Share -->
-    <div class="text-right shrink-0">
-      <div class="font-semibold">
+    <div class="text-right shrink-0 min-w-[75px]">
+      <div class="font-semibold text-ink">
         <MoneyText :amount-minor="expense.amountMinor" :currency="currency" size="sm" />
       </div>
 

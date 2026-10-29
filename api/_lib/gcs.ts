@@ -6,6 +6,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/heic',
+  'application/pdf',
 ]);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -83,7 +84,7 @@ export async function generateSignedUploadUrl(
 ): Promise<SignedUploadUrlResult> {
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     throw validationError(
-      `Unsupported file type '${contentType}'. Allowed types: jpeg, png, webp, heic.`
+      `Unsupported file type '${contentType}'. Allowed types: jpeg, png, webp, heic, pdf.`
     );
   }
 
@@ -93,7 +94,7 @@ export async function generateSignedUploadUrl(
 
   const cleanExt = filename.includes('.')
     ? filename.substring(filename.lastIndexOf('.')).toLowerCase()
-    : '.jpg';
+    : contentType === 'application/pdf' ? '.pdf' : '.jpg';
 
   const randomPart = Math.random().toString(36).substring(2, 10);
   const timestamp = Date.now();

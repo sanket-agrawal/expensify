@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Camera, Plus, Trash2, RefreshCw, AlertCircle, Loader2 } from 'lucide-vue-next';
+import { Camera, Plus, Trash2, RefreshCw, AlertCircle, Loader2, FileText } from 'lucide-vue-next';
 import Lightbox from './Lightbox.vue';
 
 export interface PhotoItem {
@@ -11,6 +11,7 @@ export interface PhotoItem {
   status: 'pending' | 'uploading' | 'done' | 'error';
   errorMessage?: string;
   file?: File;
+  contentType?: string;
 }
 
 interface Props {
@@ -45,6 +46,25 @@ function onFileSelected(event: Event) {
   }
 }
 
+function isPdfItem(photo: PhotoItem): boolean {
+  if (photo.contentType === 'application/pdf') return true;
+  if (photo.file?.type === 'application/pdf') return true;
+  if (photo.file?.name?.toLowerCase().endsWith('.pdf')) return true;
+  if (photo.objectKey?.toLowerCase().endsWith('.pdf')) return true;
+  if (photo.previewUrl?.toLowerCase().includes('.pdf')) return true;
+  return false;
+}
+
+function handleItemClick(photo: PhotoItem) {
+  if (isPdfItem(photo)) {
+    if (photo.previewUrl) {
+      window.open(photo.previewUrl, '_blank');
+    }
+  } else {
+    openLightbox(photo.previewUrl);
+  }
+}
+
 function openLightbox(url: string) {
   activeLightboxUrl.value = url;
 }
@@ -59,12 +79,28 @@ function openLightbox(url: string) {
         :key="photo.id"
         class="group relative aspect-square rounded-btn overflow-hidden bg-sand-200/50 dark:bg-white/5 border border-sand-200 dark:border-white/10"
       >
-        <!-- Image -->
+        <!-- PDF Document Display -->
+        <div
+          v-if="isPdfItem(photo)"
+          class="w-full h-full flex flex-col items-center justify-center p-2 bg-coral/10 text-coral cursor-pointer hover:bg-coral/15 transition-colors"
+          @click="handleItemClick(photo)"
+        >
+          <FileText class="w-7 h-7 mb-1" />
+          <span class="text-[10px] font-semibold text-center truncate max-w-full px-1 text-ink">
+            {{ photo.file?.name || 'PDF Bill' }}
+          </span>
+          <span class="text-[9px] uppercase tracking-wider font-bold text-coral bg-coral/20 px-1.5 py-0.5 rounded mt-0.5">
+            PDF
+          </span>
+        </div>
+
+        <!-- Image Display -->
         <img
+          v-else
           :src="photo.previewUrl"
           alt="Bill photo"
           class="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
-          @click="openLightbox(photo.previewUrl)"
+          @click="handleItemClick(photo)"
         />
 
         <!-- Uploading overlay -->
@@ -112,7 +148,7 @@ function openLightbox(url: string) {
         </button>
       </div>
 
-      <!-- Add photo button -->
+      <!-- Add photo/bill button -->
       <button
         v-if="editable && photos.length < maxPhotos"
         type="button"
@@ -123,21 +159,21 @@ function openLightbox(url: string) {
           <Camera class="w-5 h-5" />
           <Plus class="w-3.5 h-3.5" />
         </div>
-        <span class="text-xs font-medium">Add bill</span>
+        <span class="text-xs font-medium">Add bill / PDF</span>
       </button>
     </div>
 
-    <!-- Hidden file input for camera/gallery capture -->
+    <!-- Hidden file input for camera/gallery/pdf capture -->
     <input
       ref="fileInputRef"
       type="file"
-      accept="image/*"
+      accept="image/*,application/pdf"
       multiple
       class="hidden"
       @change="onFileSelected"
     />
 
-    <!-- Fullscreen lightbox -->
+    <!-- Fullscreen lightbox for images -->
     <Lightbox
       :open="!!activeLightboxUrl"
       :image-url="activeLightboxUrl || ''"

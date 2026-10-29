@@ -5,6 +5,12 @@ import path from 'node:path';
 import { createHandler, resolveTrip, type VercelRequest, type VercelResponse } from '../../../_lib/handler.js';
 import { validationError, notFoundError } from '../../../_lib/errors.js';
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default createHandler(['PUT', 'GET'], async (req: VercelRequest, res: VercelResponse, { db }: { db: Db }) => {
   const trip = await resolveTrip(db, req.query.token);
   const keyParam = Array.isArray(req.query.key) ? req.query.key[0] : req.query.key;
@@ -21,9 +27,17 @@ export default createHandler(['PUT', 'GET'], async (req: VercelRequest, res: Ver
   }
 
   if (req.method === 'PUT') {
-    const rawBuffer = Buffer.isBuffer(req.body)
-      ? req.body
-      : Buffer.from((req.body as string) || '');
+    let rawBuffer: Buffer;
+    if (Buffer.isBuffer(req.body)) {
+      rawBuffer = req.body;
+    } else if (typeof req.body === 'string') {
+      const isBase64 = /^[A-Za-z0-9+/=]+$/.test(req.body.slice(0, 100));
+      rawBuffer = isBase64 ? Buffer.from(req.body, 'base64') : Buffer.from(req.body, 'binary');
+    } else if (req.body && typeof req.body === 'object' && 'data' in req.body && Array.isArray((req.body as { data: unknown }).data)) {
+      rawBuffer = Buffer.from((req.body as { data: number[] }).data);
+    } else {
+      rawBuffer = Buffer.alloc(0);
+    }
 
     if (rawBuffer.length === 0) {
       throw validationError('Uploaded file body is empty.');

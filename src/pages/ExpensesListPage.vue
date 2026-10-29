@@ -10,13 +10,14 @@ import Button from '@/components/ui/Button.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ExpenseRow from '@/components/expense/ExpenseRow.vue';
 import Skeleton from '@/components/ui/Skeleton.vue';
+import MoneyText from '@/components/ui/MoneyText.vue';
 import type { Expense, CategoryKey } from '@shared/schemas/expense';
 
 const route = useRoute();
 const router = useRouter();
 const tripStore = useTripStore();
 const expenseStore = useExpenseStore();
-const { currentUser } = useCurrentUser();
+const { currentUser, initUserForTrip } = useCurrentUser();
 
 const token = computed(() => (route.params.token as string) || '');
 const trip = computed(() => tripStore.currentTrip);
@@ -28,6 +29,9 @@ const selectedParticipantId = ref<string | 'all'>('all');
 const isLoading = ref(true);
 
 onMounted(async () => {
+  if (token.value) {
+    initUserForTrip(token.value);
+  }
   if (!trip.value && token.value) {
     await tripStore.fetchTrip(token.value);
   }
@@ -142,7 +146,7 @@ function clearFilters() {
 </script>
 
 <template>
-  <div class="max-w-xl mx-auto px-4 py-6 pb-28 sm:pb-16 space-y-4">
+  <div class="max-w-xl w-full mx-auto px-4 py-6 pb-28 sm:pb-16 space-y-4 min-w-0">
     <!-- Header with title & Add button -->
     <div class="flex items-center justify-between">
       <div>
@@ -182,9 +186,9 @@ function clearFilters() {
     </div>
 
     <!-- Filters Row: Participants & Categories -->
-    <div class="space-y-2">
+    <div class="space-y-2 max-w-full min-w-0 overflow-hidden">
       <!-- Participant filter chips -->
-      <div v-if="trip && trip.participants.length > 0" class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div v-if="trip && trip.participants.length > 0" class="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full min-w-0 no-scrollbar">
         <button
           type="button"
           class="px-2.5 py-1 rounded-chip text-xs font-medium whitespace-nowrap transition-all"
@@ -214,7 +218,7 @@ function clearFilters() {
       </div>
 
       <!-- Category filter chips if categories exist -->
-      <div v-if="availableCategories.length > 1" class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div v-if="availableCategories.length > 1" class="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full min-w-0 no-scrollbar">
         <button
           type="button"
           class="px-2.5 py-1 rounded-chip text-xs font-medium whitespace-nowrap transition-all"
@@ -261,6 +265,9 @@ function clearFilters() {
         <!-- Group Date Header -->
         <div class="flex items-center justify-between px-1 text-xs font-semibold text-ink-muted uppercase tracking-wider">
           <span>{{ group.displayDate }}</span>
+          <span class="text-ink font-semibold normal-case">
+            <MoneyText :amount-minor="group.totalMinor" :currency="currency" size="xs" />
+          </span>
         </div>
 
         <!-- Expenses in this group -->

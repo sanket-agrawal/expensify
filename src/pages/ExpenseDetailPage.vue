@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Edit3, Trash2, Calendar } from 'lucide-vue-next';
+import { ArrowLeft, Edit3, Trash2, Calendar, FileText, ExternalLink } from 'lucide-vue-next';
 import { useTripStore } from '@/stores/tripStore';
 import { useExpenseStore } from '@/stores/expenseStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
@@ -100,6 +100,20 @@ async function handleDelete() {
     toastError((err as Error).message || 'Failed to delete expense');
   } finally {
     isDeleting.value = false;
+  }
+}
+
+function isPdfPhoto(photo: { contentType?: string; objectKey: string }): boolean {
+  return photo.contentType === 'application/pdf' || photo.objectKey.toLowerCase().endsWith('.pdf');
+}
+
+function handlePhotoClick(photo: { contentType?: string; objectKey: string }) {
+  const url = resolvedPhotoUrls.value[photo.objectKey];
+  if (!url) return;
+  if (isPdfPhoto(photo)) {
+    window.open(url, '_blank');
+  } else {
+    activeLightboxUrl.value = url;
   }
 }
 </script>
@@ -231,21 +245,34 @@ async function handleDelete() {
         </div>
       </Card>
 
-      <!-- Bill Photos Gallery -->
+      <!-- Bill Attachments Gallery -->
       <Card v-if="expense.photos && expense.photos.length > 0" padding="md" class="space-y-3">
         <h3 class="font-display font-semibold text-base text-ink">
-          Receipt photos ({{ expense.photos.length }})
+          Receipts & Bills ({{ expense.photos.length }})
         </h3>
 
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div
             v-for="photo in expense.photos"
             :key="photo.objectKey"
-            class="aspect-square rounded-btn overflow-hidden bg-sand-200/50 dark:bg-white/5 border border-sand-200 dark:border-white/10 cursor-pointer hover:scale-102 transition-transform duration-150"
-            @click="activeLightboxUrl = resolvedPhotoUrls[photo.objectKey] || ''"
+            class="aspect-square rounded-btn overflow-hidden bg-sand-200/50 dark:bg-white/5 border border-sand-200 dark:border-white/10 cursor-pointer hover:scale-102 transition-transform duration-150 flex flex-col justify-center items-center"
+            @click="handlePhotoClick(photo)"
           >
+            <!-- PDF Document -->
+            <div
+              v-if="isPdfPhoto(photo)"
+              class="w-full h-full flex flex-col items-center justify-center p-3 bg-coral/10 text-coral hover:bg-coral/15 transition-colors text-center"
+            >
+              <FileText class="w-8 h-8 mb-1.5" />
+              <span class="text-xs font-semibold text-ink line-clamp-2">PDF Document</span>
+              <span class="text-[10px] text-coral font-bold flex items-center gap-1 mt-1 bg-coral/20 px-2 py-0.5 rounded">
+                <ExternalLink class="w-3 h-3" /> View PDF
+              </span>
+            </div>
+
+            <!-- Image Photo -->
             <img
-              v-if="resolvedPhotoUrls[photo.objectKey]"
+              v-else-if="resolvedPhotoUrls[photo.objectKey]"
               :src="resolvedPhotoUrls[photo.objectKey]"
               alt="Receipt photo"
               class="w-full h-full object-cover"

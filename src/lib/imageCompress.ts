@@ -29,6 +29,18 @@ export async function compressImage(
     mimeType = 'image/jpeg',
   } = options;
 
+  // If PDF file, bypass canvas image compression entirely
+  if (inputFile.type === 'application/pdf' || inputFile.name.toLowerCase().endsWith('.pdf')) {
+    return {
+      file: inputFile,
+      blob: inputFile,
+      width: 0,
+      height: 0,
+      originalSizeBytes: inputFile.size,
+      compressedSizeBytes: inputFile.size,
+    };
+  }
+
   // If already small (< 500KB) and correct format, return directly without degradation
   if (inputFile.size < 500 * 1024 && inputFile.type === mimeType) {
     return {

@@ -38,7 +38,7 @@ const isAddOrEditExpense = computed(() => {
     />
 
     <!-- Main Viewport -->
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
       <router-view v-slot="{ Component }">
         <Transition
           name="page"

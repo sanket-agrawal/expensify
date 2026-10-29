@@ -40,6 +40,7 @@ export default createHandler(['GET', 'POST'], async (req, res, { db }) => {
     amountMinor: input.amountMinor,
     date: input.date || new Date().toISOString().slice(0, 10),
     notes: input.notes || '',
+    attachment: input.attachment ?? null,
     createdAt: new Date(),
   };
 

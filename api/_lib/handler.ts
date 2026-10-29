@@ -29,7 +29,30 @@ export type HandlerFn = (
  * Parses request body if not already parsed by Vercel
  */
 async function parseBody(req: VercelRequest): Promise<unknown> {
-  if (req.body !== undefined && req.body !== null) {
+  const contentType = (req.headers['content-type'] as string) || '';
+  const isBinary =
+    contentType.startsWith('image/') ||
+    contentType === 'application/pdf' ||
+    contentType === 'application/octet-stream' ||
+    contentType.includes('multipart/');
+
+  if (isBinary) {
+    if (Buffer.isBuffer(req.body)) {
+      return req.body;
+    }
+    if (req.body && typeof req.body === 'object' && 'data' in req.body && Array.isArray((req.body as { data: unknown }).data)) {
+      return Buffer.from((req.body as { data: number[] }).data);
+    }
+    if (typeof req.body === 'string') {
+      return Buffer.from(req.body, 'binary');
+    }
+    if ((req as { readableEnded?: boolean }).readableEnded || (req as { complete?: boolean }).complete) {
+      if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        return Buffer.from(JSON.stringify(req.body));
+      }
+      return Buffer.alloc(0);
+    }
+  } else if (req.body !== undefined && req.body !== null) {
     if (typeof req.body === 'string') {
       try {
         return JSON.parse(req.body);
@@ -42,16 +65,14 @@ async function parseBody(req: VercelRequest): Promise<unknown> {
 
   // If request has already finished reading, resolve immediately
   if ((req as { readableEnded?: boolean }).readableEnded || (req as { complete?: boolean }).complete) {
-    return {};
+    return isBinary ? Buffer.alloc(0) : {};
   }
-
-  const contentType = (req.headers['content-type'] as string) || '';
 
   return new Promise((resolve, reject) => {
     // Failsafe timer so serverless execution never hangs indefinitely
     const timer = setTimeout(() => {
-      resolve(req.body ?? {});
-    }, 1500);
+      resolve(req.body ?? (isBinary ? Buffer.alloc(0) : {}));
+    }, 2500);
 
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => {
@@ -61,7 +82,7 @@ async function parseBody(req: VercelRequest): Promise<unknown> {
       clearTimeout(timer);
       const buffer = Buffer.concat(chunks);
       if (buffer.length === 0) {
-        resolve({});
+        resolve(isBinary ? Buffer.alloc(0) : {});
         return;
       }
 
@@ -74,9 +95,10 @@ async function parseBody(req: VercelRequest): Promise<unknown> {
         return;
       }
 
-      // If image or binary stream, return the raw Buffer
+      // If image, PDF or binary stream, return the raw Buffer
       if (
         contentType.startsWith('image/') ||
+        contentType === 'application/pdf' ||
         contentType === 'application/octet-stream' ||
         contentType.includes('multipart/')
       ) {

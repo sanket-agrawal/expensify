@@ -103,9 +103,15 @@ describe('api/_lib/handler.ts', () => {
 });
 
 describe('api/_lib/gcs.ts validation', () => {
+  it('allows application/pdf content type', async () => {
+    const res = await generateSignedUploadUrl('trip_123', 'bill.pdf', 'application/pdf', 1024);
+    expect(res.objectKey).toContain('.pdf');
+    expect(res.uploadUrl).toBeDefined();
+  });
+
   it('rejects disallowed content types', async () => {
     await expect(
-      generateSignedUploadUrl('trip_123', 'doc.pdf', 'application/pdf', 1024)
+      generateSignedUploadUrl('trip_123', 'doc.zip', 'application/zip', 1024)
     ).rejects.toThrow('Unsupported file type');
   });
 

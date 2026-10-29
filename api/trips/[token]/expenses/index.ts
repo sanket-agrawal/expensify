@@ -1,7 +1,7 @@
-import { createHandler, resolveTrip } from '../../../_lib/handler';
-import { getActor } from '../../../_lib/auth';
-import { validationError } from '../../../_lib/errors';
-import { createExpenseSchema } from '../../../../shared/schemas/expense';
+import { createHandler, resolveTrip } from '../../../_lib/handler.js';
+import { getActor } from '../../../_lib/auth.js';
+import { validationError } from '../../../_lib/errors.js';
+import { createExpenseSchema } from '../../../../shared/schemas/expense.js';
 
 export default createHandler(['GET', 'POST'], async (req, res, { db }) => {
   const trip = await resolveTrip(db, req.query.token);

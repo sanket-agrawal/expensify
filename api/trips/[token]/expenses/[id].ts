@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
-import { createHandler, resolveTrip } from '../../../_lib/handler';
-import { validationError, notFoundError } from '../../../_lib/errors';
-import { updateExpenseSchema } from '../../../../shared/schemas/expense';
+import { createHandler, resolveTrip } from '../../../_lib/handler.js';
+import { validationError, notFoundError } from '../../../_lib/errors.js';
+import { updateExpenseSchema } from '../../../../shared/schemas/expense.js';
 
 export default createHandler(['PATCH', 'DELETE'], async (req, _res, { db }) => {
   const trip = await resolveTrip(db, req.query.token);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createHandler, resolveTrip } from '../../../_lib/handler';
-import { generateSignedUploadUrl } from '../../../_lib/gcs';
+import { createHandler, resolveTrip } from '../../../_lib/handler.js';
+import { generateSignedUploadUrl } from '../../../_lib/gcs.js';
 
 const signUploadSchema = z.object({
   filename: z.string().min(1),

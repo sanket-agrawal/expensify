@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { createHandler } from '../_lib/handler';
-import { createTripSchema } from '../../shared/schemas/trip';
+import { createHandler } from '../_lib/handler.js';
+import { createTripSchema } from '../../shared/schemas/trip.js';
 
 const COLOR_KEYS = ['lagoon', 'coral', 'sunshine', 'seafoam', 'deep-sea', 'sky'];
 

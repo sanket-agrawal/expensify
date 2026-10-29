@@ -1,5 +1,5 @@
 import { Storage } from '@google-cloud/storage';
-import { validationError } from './errors';
+import { validationError } from './errors.js';
 
 const ALLOWED_CONTENT_TYPES = new Set([
   'image/jpeg',

@@ -2,8 +2,8 @@ import type { Db } from 'mongodb';
 import { Binary } from 'mongodb';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHandler, resolveTrip, type VercelRequest, type VercelResponse } from '../../../_lib/handler';
-import { validationError, notFoundError } from '../../../_lib/errors';
+import { createHandler, resolveTrip, type VercelRequest, type VercelResponse } from '../../../_lib/handler.js';
+import { validationError, notFoundError } from '../../../_lib/errors.js';
 
 export default createHandler(['PUT', 'GET'], async (req: VercelRequest, res: VercelResponse, { db }: { db: Db }) => {
   const trip = await resolveTrip(db, req.query.token);

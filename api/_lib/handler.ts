@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ZodError } from 'zod';
 import { Db, ObjectId } from 'mongodb';
-import { ApiError, validationError, notFoundError } from './errors';
-import { getDb } from './db';
-import type { Trip } from '@shared/schemas/trip';
+import { ApiError, validationError, notFoundError } from './errors.js';
+import { getDb } from './db.js';
+import type { Trip } from '../../shared/schemas/trip.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 

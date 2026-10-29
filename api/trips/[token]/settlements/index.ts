@@ -1,6 +1,6 @@
-import { createHandler, resolveTrip } from '../../../_lib/handler';
-import { validationError } from '../../../_lib/errors';
-import { createSettlementSchema } from '../../../../shared/schemas/settlement';
+import { createHandler, resolveTrip } from '../../../_lib/handler.js';
+import { validationError } from '../../../_lib/errors.js';
+import { createSettlementSchema } from '../../../../shared/schemas/settlement.js';
 
 export default createHandler(['GET', 'POST'], async (req, res, { db }) => {
   const trip = await resolveTrip(db, req.query.token);

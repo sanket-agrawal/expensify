@@ -1,6 +1,6 @@
-import { createHandler, resolveTrip } from '../../../_lib/handler';
-import { validationError } from '../../../_lib/errors';
-import { generateSignedPhotoUrl } from '../../../_lib/gcs';
+import { createHandler, resolveTrip } from '../../../_lib/handler.js';
+import { validationError } from '../../../_lib/errors.js';
+import { generateSignedPhotoUrl } from '../../../_lib/gcs.js';
 
 export default createHandler(['GET'], async (req, _res, { db }) => {
   const trip = await resolveTrip(db, req.query.token);

@@ -61,6 +61,16 @@ async function request<T>(
 
 export const apiClient = {
   /**
+   * List all trips from MongoDB
+   */
+  async getTrips(): Promise<{ trips: Trip[] }> {
+    const res = await request<{ trips: unknown[] }>('/api/trips');
+    return {
+      trips: z.array(tripSchema).parse(res.trips),
+    };
+  },
+
+  /**
    * Create a new trip (Stored directly in MongoDB)
    */
   async createTrip(input: CreateTripInput): Promise<{ trip: Trip; accessToken: string }> {

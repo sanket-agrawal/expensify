@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { Plus, Compass, ArrowRight } from 'lucide-vue-next';
 import { APP_CONFIG } from '@/config/app';
@@ -7,13 +7,25 @@ import { useTripStore } from '@/stores/tripStore';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import Skeleton from '@/components/ui/Skeleton.vue';
 
 const router = useRouter();
 const tripStore = useTripStore();
 
-onMounted(() => {
-  tripStore.loadRecentTrips();
+onMounted(async () => {
+  await tripStore.loadAllTrips();
 });
+
+const displayTrips = computed(() => {
+  return tripStore.allTrips;
+});
+
+function formatDate(dateVal: string | Date | undefined): string {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 function goToTrip(token: string) {
   router.push(`/t/${token}`);
@@ -48,24 +60,35 @@ function createNewTrip() {
       </div>
     </div>
 
-    <!-- Recent trips on this device -->
+    <!-- Trips from Database -->
     <div class="space-y-4">
       <div class="flex items-center justify-between px-1">
         <h2 class="font-display text-lg font-semibold text-ink flex items-center gap-2">
           <Compass class="w-4.5 h-4.5 text-deep-sea dark:text-sky" />
           Your trips
         </h2>
-        <span class="text-xs text-ink-muted">Saved on this device</span>
       </div>
 
-      <div v-if="tripStore.recentTrips.length > 0" class="space-y-3">
+      <!-- Loading skeleton -->
+      <div v-if="tripStore.loading && displayTrips.length === 0" class="space-y-3">
+        <Card v-for="i in 3" :key="i" padding="sm" class="flex items-center gap-3">
+          <Skeleton width="w-10" height="h-10" radius="md" />
+          <div class="flex-1 space-y-2">
+            <Skeleton width="w-40" height="h-4" />
+            <Skeleton width="w-24" height="h-3" />
+          </div>
+        </Card>
+      </div>
+
+      <!-- Trips List -->
+      <div v-else-if="displayTrips.length > 0" class="space-y-3">
         <Card
-          v-for="trip in tripStore.recentTrips"
-          :key="trip.token"
+          v-for="trip in displayTrips"
+          :key="trip.accessToken"
           hover
           padding="sm"
           class="flex items-center justify-between"
-          @click="goToTrip(trip.token)"
+          @click="goToTrip(trip.accessToken)"
         >
           <div class="flex items-center gap-3 min-w-0">
             <span class="text-2xl shrink-0 select-none">{{ trip.emoji || '🌴' }}</span>
@@ -74,7 +97,8 @@ function createNewTrip() {
                 {{ trip.name }}
               </h3>
               <p class="text-xs text-ink-muted">
-                Visited {{ trip.lastVisited }} • {{ trip.currency }}
+                {{ trip.participants.length }} friends • {{ trip.currency }}
+                <span v-if="trip.createdAt"> • {{ formatDate(trip.createdAt) }}</span>
               </p>
             </div>
           </div>
@@ -82,6 +106,7 @@ function createNewTrip() {
         </Card>
       </div>
 
+      <!-- Empty state -->
       <EmptyState
         v-else
         title="No trips yet"

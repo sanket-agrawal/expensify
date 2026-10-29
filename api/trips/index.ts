@@ -4,7 +4,23 @@ import { createTripSchema } from '../../shared/schemas/trip.js';
 
 const COLOR_KEYS = ['lagoon', 'coral', 'sunshine', 'seafoam', 'deep-sea', 'sky'];
 
-export default createHandler(['POST'], async (req, res, { db }) => {
+export default createHandler(['GET', 'POST'], async (req, res, { db }) => {
+  if (req.method === 'GET') {
+    const trips = await db
+      .collection('trips')
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+
+    return {
+      trips: trips.map((t) => ({
+        ...t,
+        _id: t._id.toString(),
+      })),
+    };
+  }
+
   const input = createTripSchema.parse(req.body);
 
   // Generate unguessable URL-safe access token (24 chars)

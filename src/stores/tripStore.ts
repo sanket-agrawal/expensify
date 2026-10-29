@@ -15,9 +15,26 @@ const RECENT_TRIPS_KEY = 'tripsplit_recent_trips';
 
 export const useTripStore = defineStore('trip', () => {
   const currentTrip = ref<Trip | null>(null);
+  const allTrips = ref<Trip[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const recentTrips = ref<RecentTripItem[]>([]);
+
+  async function loadAllTrips(): Promise<Trip[]> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const res = await apiClient.getTrips();
+      allTrips.value = res.trips;
+      return res.trips;
+    } catch (err) {
+      const msg = (err as Error).message || 'Failed to load trips';
+      error.value = msg;
+      return [];
+    } finally {
+      loading.value = false;
+    }
+  }
 
   function loadRecentTrips() {
     if (typeof window === 'undefined') return;
@@ -90,10 +107,12 @@ export const useTripStore = defineStore('trip', () => {
 
   return {
     currentTrip,
+    allTrips,
     loading,
     error,
     recentTrips,
     loadRecentTrips,
+    loadAllTrips,
     fetchTrip,
     createTrip,
     getParticipant,
